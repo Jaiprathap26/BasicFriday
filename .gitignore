@@ -1,0 +1,5 @@
+.env
+friday_memory.db
+__pycache__/
+*.pyc
+venv/
