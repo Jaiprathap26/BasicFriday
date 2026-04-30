@@ -5,10 +5,14 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from dotenv import load_dotenv
 from memory import init_db, save_memory, get_memories, get_all_recent
 from scheduler import start_scheduler, morning_briefing
+from agents.coach import coach_reply
+from agents.doubt_solver import solve_doubt
+from agents.lead_tracker import init_leads, add_lead, get_leads, update_lead_status
 
 load_dotenv()
 
 init_db()
+init_leads()
 
 INCEPTION_API_KEY = os.getenv("INCEPTION_API_KEY")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -61,20 +65,42 @@ def ask_friday(user_message: str) -> str:
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_msg = update.message.text
+    msg_lower = user_msg.lower()
     print(f"[{update.effective_user.first_name}]: {user_msg}")
 
-    # auto-save logs when user says "log: ..."
-    if user_msg.lower().startswith("log:"):
+    # auto-save logs
+    if msg_lower.startswith("log:"):
         save_memory("match_log", user_msg[4:].strip())
 
-    # if asking about history, pull from memory and re-ask
-    if "how was my week" in user_msg.lower() or "last week" in user_msg.lower():
+    # route to specialized agents
+    if msg_lower.startswith("coach:"):
+        reply = coach_reply(user_msg[6:].strip())
+
+    elif msg_lower.startswith("doubt:"):
+        reply = solve_doubt(user_msg[6:].strip())
+
+    elif msg_lower.startswith("lead add:"):
+        parts = user_msg[9:].strip().split(",")
+        name = parts[0].strip() if len(parts) > 0 else "unknown"
+        platform = parts[1].strip() if len(parts) > 1 else "unknown"
+        notes = parts[2].strip() if len(parts) > 2 else ""
+        reply = add_lead(name, platform, notes)
+
+    elif msg_lower.startswith("lead list"):
+        leads = get_leads()
+        if leads:
+            reply = "📋 recent leads:\n" + "\n".join([f"{d} | {n} | {p} | {s}" for d, n, p, s, _ in leads])
+        else:
+            reply = "no leads tracked yet. use: lead add: name, platform, notes"
+
+    elif "how was my week" in msg_lower or "last week" in msg_lower:
         logs = get_memories("match_log", limit=7)
         if logs:
             memory_text = "\n".join([f"{d}: {c}" for d, c in logs])
             reply = ask_friday(f"summarize these match logs for me:\n{memory_text}")
         else:
             reply = ask_friday(user_msg)
+
     else:
         reply = ask_friday(user_msg)
 
