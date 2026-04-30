@@ -1,0 +1,1 @@
+worker: python friday_bot.py
