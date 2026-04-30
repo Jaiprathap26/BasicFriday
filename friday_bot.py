@@ -116,6 +116,59 @@ async def brief_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     morning_briefing()
     await update.message.reply_text("briefing triggered — check above.")
 
+async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # pull recent logs
+    logs = get_memories("match_log", limit=5)
+    log_text = ""
+    if logs:
+        log_text = "\n".join([f"  {d}: {c[:60]}..." if len(c) > 60 else f"  {d}: {c}" for d, c in logs])
+    else:
+        log_text = "  no logs yet. send: log: your update"
+
+    # pull recent leads
+    leads = get_leads()
+    lead_text = ""
+    if leads:
+        lead_text = "\n".join([f"  {n} | {p} | {s}" for d, n, p, s, _ in leads])
+    else:
+        lead_text = "  no leads tracked yet"
+
+    status_msg = f"""📊 FRIDAY STATUS DASHBOARD
+━━━━━━━━━━━━━━━━━━━━━
+🎯 ACTIVE GOALS
+  → PGCET exam: May 24 (24 days left)
+  → First freelance income: end of May
+  → BrokerBot MVP: in progress
+  → GitHub streak: daily
+  → LinkedIn posts: daily
+
+📝 RECENT MATCH LOGS
+{log_text}
+
+🏷️ LEAD TRACKER
+{lead_text}
+
+🤖 AGENT STATUS
+  ✅ FRIDAY core — online
+  ✅ Coach agent — online
+  ✅ Doubt solver — online
+  ✅ Lead tracker — online
+  ✅ Morning scheduler — 7am daily
+  ✅ Memory (SQLite) — active
+  ✅ Railway deploy — 24/7
+
+⚡ COMMANDS
+  log: <update> → save a match log
+  coach: <question> → career/study advice
+  doubt: <question> → technical answer
+  lead add: name, platform, notes → track a lead
+  lead list → see all leads
+  /brief → trigger morning briefing
+  /status → this dashboard
+━━━━━━━━━━━━━━━━━━━━━"""
+
+    await update.message.reply_text(status_msg)
+
 
 def main():
     app = Application.builder().token(TELEGRAM_TOKEN).build()
@@ -123,6 +176,7 @@ def main():
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("brief", brief_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(CommandHandler("status", status_command))
 
     start_scheduler()
     print("FRIDAY is online. Ctrl+C to stop.")
